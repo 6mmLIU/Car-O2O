@@ -3,7 +3,7 @@
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="cn.wolfcode.business.mapper.CarPackageAuditMapper">
-    
+
     <resultMap type="CarPackageAudit" id="CarPackageAuditResult">
         <result property="id"    column="id"    />
         <result property="serviceItemId"    column="service_item_id"    />
@@ -23,7 +23,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectCarPackageAuditList" parameterType="CarPackageAudit" resultMap="CarPackageAuditResult">
         <include refid="selectCarPackageAuditVo"/>
-        <where>  
+        <where>
             <if test="serviceItemId != null "> and service_item_id = #{serviceItemId}</if>
             <if test="serviceItemName != null  and serviceItemName != ''"> and service_item_name like concat('%', #{serviceItemName}, '%')</if>
             <if test="serviceItemInfo != null  and serviceItemInfo != ''"> and service_item_info = #{serviceItemInfo}</if>
@@ -32,14 +32,24 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="creatorId != null  and creatorId != ''"> and creator_id = #{creatorId}</if>
             <if test="info != null  and info != ''"> and info = #{info}</if>
             <if test="status != null "> and status = #{status}</if>
+             <if test="params.processInstanceIdList!=null">
+                 and instance_id in
+                 <foreach collection="params.processInstanceIdList" item="instanceId" open="(" close=")" separator=",">
+                     #{instanceId}
+                 </foreach>
+             </if>
         </where>
     </select>
-    
+
     <select id="selectCarPackageAuditById" parameterType="Long" resultMap="CarPackageAuditResult">
         <include refid="selectCarPackageAuditVo"/>
         where id = #{id}
     </select>
-        
+    <select id="selectByInstanceId" resultMap="CarPackageAuditResult">
+        <include refid="selectCarPackageAuditVo"/>
+        where instance_id=#{instanceId}
+    </select>
+
     <insert id="insertCarPackageAudit" parameterType="CarPackageAudit" useGeneratedKeys="true" keyProperty="id">
         insert into bus_car_package_audit
         <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -87,7 +97,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </delete>
 
     <delete id="deleteCarPackageAuditByIds" parameterType="String">
-        delete from bus_car_package_audit where id in 
+        delete from bus_car_package_audit where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>

@@ -5,17 +5,11 @@ import java.io.InputStream;
 import java.util.List;
 import javax.servlet.http.HttpServletResponse;
 
+import cn.wolfcode.business.dto.AuditDTO;
 import org.apache.commons.compress.utils.IOUtils;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import cn.wolfcode.common.annotation.Log;
 import cn.wolfcode.common.core.controller.BaseController;
 import cn.wolfcode.common.core.domain.AjaxResult;
@@ -33,8 +27,7 @@ import cn.wolfcode.common.core.page.TableDataInfo;
  */
 @RestController
 @RequestMapping("/business/audit")
-public class CarPackageAuditController extends BaseController
-{
+public class CarPackageAuditController extends BaseController {
     @Autowired
     private ICarPackageAuditService carPackageAuditService;
 
@@ -43,10 +36,30 @@ public class CarPackageAuditController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('business:audit:list')")
     @GetMapping("/list")
-    public TableDataInfo list(CarPackageAudit carPackageAudit)
-    {
+    public TableDataInfo list(CarPackageAudit carPackageAudit) {
         startPage();
         List<CarPackageAudit> list = carPackageAuditService.selectCarPackageAuditList(carPackageAudit);
+        return getDataTable(list);
+    }
+
+    /**
+     * 查询我的待办
+     */
+
+    @GetMapping("/todoTaskList")
+    public TableDataInfo todoTaskList(CarPackageAudit carPackageAudit) {
+        startPage();
+        List<CarPackageAudit> list = carPackageAuditService.selectTodoTaskList(carPackageAudit);
+        return getDataTable(list);
+    }
+
+    /**
+     * 查询我的已办任务列表
+     */
+    @GetMapping("/doneTaskList")
+    public TableDataInfo doneTaskList(CarPackageAudit carPackageAudit) {
+        startPage();
+        List<CarPackageAudit> list = carPackageAuditService.selectDoneTaskList(carPackageAudit);
         return getDataTable(list);
     }
 
@@ -56,8 +69,7 @@ public class CarPackageAuditController extends BaseController
     @PreAuthorize("@ss.hasPermi('business:audit:export')")
     @Log(title = "套餐审核", businessType = BusinessType.EXPORT)
     @PostMapping("/export")
-    public void export(HttpServletResponse response, CarPackageAudit carPackageAudit)
-    {
+    public void export(HttpServletResponse response, CarPackageAudit carPackageAudit) {
         List<CarPackageAudit> list = carPackageAuditService.selectCarPackageAuditList(carPackageAudit);
         ExcelUtil<CarPackageAudit> util = new ExcelUtil<CarPackageAudit>(CarPackageAudit.class);
         util.exportExcel(response, list, "套餐审核数据");
@@ -68,8 +80,7 @@ public class CarPackageAuditController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('business:audit:query')")
     @GetMapping(value = "/{id}")
-    public AjaxResult getInfo(@PathVariable("id") Long id)
-    {
+    public AjaxResult getInfo(@PathVariable("id") Long id) {
         return AjaxResult.success(carPackageAuditService.selectCarPackageAuditById(id));
     }
 
@@ -79,8 +90,7 @@ public class CarPackageAuditController extends BaseController
     @PreAuthorize("@ss.hasPermi('business:audit:add')")
     @Log(title = "套餐审核", businessType = BusinessType.INSERT)
     @PostMapping
-    public AjaxResult add(@RequestBody CarPackageAudit carPackageAudit)
-    {
+    public AjaxResult add(@RequestBody CarPackageAudit carPackageAudit) {
         return toAjax(carPackageAuditService.insertCarPackageAudit(carPackageAudit));
     }
 
@@ -90,8 +100,7 @@ public class CarPackageAuditController extends BaseController
     @PreAuthorize("@ss.hasPermi('business:audit:edit')")
     @Log(title = "套餐审核", businessType = BusinessType.UPDATE)
     @PutMapping
-    public AjaxResult edit(@RequestBody CarPackageAudit carPackageAudit)
-    {
+    public AjaxResult edit(@RequestBody CarPackageAudit carPackageAudit) {
         return toAjax(carPackageAuditService.updateCarPackageAudit(carPackageAudit));
     }
 
@@ -100,15 +109,22 @@ public class CarPackageAuditController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('business:audit:remove')")
     @Log(title = "套餐审核", businessType = BusinessType.DELETE)
-	@DeleteMapping("/{ids}")
-    public AjaxResult remove(@PathVariable Long[] ids)
-    {
+    @DeleteMapping("/{ids}")
+    public AjaxResult remove(@PathVariable Long[] ids) {
         return toAjax(carPackageAuditService.deleteCarPackageAuditByIds(ids));
     }
+
     @GetMapping("/getProcessImg")
-    public void getProcessImg(String instanceId,HttpServletResponse response) throws IOException {
-        InputStream  inputStream=carPackageAuditService.getProcessImg(instanceId);
+    public void getProcessImg(String instanceId, HttpServletResponse response) throws IOException {
+        InputStream inputStream = carPackageAuditService.getProcessImg(instanceId);
         response.setContentType("application/octet-stream");
-        IOUtils.copy(inputStream,response.getOutputStream());
+        IOUtils.copy(inputStream, response.getOutputStream());
+    }
+
+    @PatchMapping(headers = "cmd=audit")
+    public AjaxResult audit(@RequestBody AuditDTO dto) {
+        carPackageAuditService.audit(dto);
+        return AjaxResult.success();
+
     }
 }

@@ -298,7 +298,7 @@ public class BusServiceItemServiceImpl implements IBusServiceItemService {
         if (financeId != null) {
             map.put("financeId", financeId);
         }
-        map.put("disCountPrice", audit.getServiceItemPrice());
+        map.put("disCountPrice", audit.getServiceItemPrice().longValue());
         //发起流程实例
         ProcessInstance processInstance = runtimeService.startProcessInstanceByKey(processDefinitionKey, businessKey, map);
         //将activity中生成流程实例的id更新到cat_package_audit表中
