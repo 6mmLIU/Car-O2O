@@ -82,7 +82,7 @@ export function audit(data) {
 // 我的已办列表 listDoneTask
 export function listDoneTask(query) {
   return request({
-    url: '/business/audit/doneTaskList',
+    url: '/business/audit/selectDoneTaskList',
     method: 'get',
     params:query,
   })

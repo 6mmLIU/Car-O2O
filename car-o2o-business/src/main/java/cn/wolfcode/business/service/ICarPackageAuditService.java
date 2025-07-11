@@ -4,6 +4,7 @@ import java.io.InputStream;
 import java.util.List;
 import cn.wolfcode.business.domain.CarPackageAudit;
 import cn.wolfcode.business.dto.AuditDTO;
+import cn.wolfcode.business.vo.HistoryVO;
 
 /**
  * 套餐审核Service接口
@@ -68,4 +69,8 @@ public interface ICarPackageAuditService
     List<CarPackageAudit> selectDoneTaskList(CarPackageAudit carPackageAudit);
 
     void audit(AuditDTO dto);
+
+    List<HistoryVO> getHistoryVOList(String instanceId);
+
+    void processCancel(Long id);
 }

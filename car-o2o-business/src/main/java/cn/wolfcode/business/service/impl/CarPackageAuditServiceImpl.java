@@ -5,6 +5,7 @@ import cn.wolfcode.business.domain.BusServiceItem;
 import cn.wolfcode.business.dto.AuditDTO;
 import cn.wolfcode.business.mapper.BusBpmnInfoMapper;
 import cn.wolfcode.business.mapper.BusServiceItemMapper;
+import cn.wolfcode.business.vo.HistoryVO;
 import cn.wolfcode.common.utils.PageUtils;
 import cn.wolfcode.common.utils.SecurityUtils;
 import org.activiti.bpmn.model.BpmnModel;
@@ -12,10 +13,12 @@ import org.activiti.bpmn.model.BpmnModel;
 import org.activiti.engine.HistoryService;
 import org.activiti.engine.RepositoryService;
 import org.activiti.engine.TaskService;
+import org.activiti.engine.history.HistoricActivityInstance;
 import org.activiti.engine.history.HistoricTaskInstance;
 import org.activiti.engine.repository.ProcessDefinition;
 import org.activiti.engine.runtime.Execution;
 import org.activiti.engine.runtime.ProcessInstance;
+import org.activiti.engine.task.Comment;
 import org.activiti.engine.task.Task;
 
 import java.io.InputStream;
@@ -23,7 +26,6 @@ import java.util.*;
 
 import cn.wolfcode.common.utils.DateUtils;
 import org.activiti.engine.RuntimeService;
-import org.activiti.image.impl.DefaultProcessDiagramCanvas;
 import org.activiti.image.impl.DefaultProcessDiagramGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -123,29 +125,110 @@ public class CarPackageAuditServiceImpl implements ICarPackageAuditService {
         return carPackageAuditMapper.deleteCarPackageAuditById(id);
     }
 
+
     @Override
     public InputStream getProcessImg(String instanceId) {
         if (instanceId == null) {
             throw new RuntimeException("非法参数");
         }
+
         DefaultProcessDiagramGenerator generator = new DefaultProcessDiagramGenerator();
         ProcessInstance processInstance = runtimeService.createProcessInstanceQuery()
                 .processInstanceId(instanceId)
                 .singleResult();
-//TODO:2025/7/8 当审批完成后,需要验证是否正常
-        BpmnModel bpmnModel = repositoryService.getBpmnModel(processInstance.getProcessDefinitionId());
-        //List<String> collect=Stream.of("sid-xxxxxxxxxxxxx").collect(Collectors.toList());
-        List<Execution> executionList = runtimeService.createExecutionQuery()
-                .processInstanceId(processInstance.getProcessInstanceId())
-                .list();
-        List<String> list = new ArrayList<>();
-        for (Execution execution : executionList) {
-            String activityId = execution.getActivityId();
-            list.add(activityId);
+
+        BpmnModel bpmnModel;
+        List<String> activeActivityIds = new ArrayList<>();  // 当前活动节点
+        List<String> highLightedFlows = new ArrayList<>();   // 高亮流程线
+
+        if (processInstance != null) {
+            // 流程实例正在运行
+            bpmnModel = repositoryService.getBpmnModel(processInstance.getProcessDefinitionId());
+
+            // 只获取当前活动的节点
+            List<Execution> executionList = runtimeService.createExecutionQuery()
+                    .processInstanceId(instanceId)
+                    .list();
+
+            for (Execution execution : executionList) {
+                if (execution.getActivityId() != null) {
+                    activeActivityIds.add(execution.getActivityId());
+                }
+            }
+        } else {
+            // 流程已结束，不高亮任何节点，或者只高亮结束节点
+            BusBpmnInfo bpmnInfo = busBpmnInfoMapper.selectByType(0);
+            String processDefinitionKey = bpmnInfo.getProcessDefinitionKey();
+            ProcessDefinition processDefinition = repositoryService.createProcessDefinitionQuery()
+                    .processDefinitionKey(processDefinitionKey)
+                    .latestVersion()
+                    .singleResult();
+            bpmnModel = repositoryService.getBpmnModel(processDefinition.getId());
+
+            // 对于已结束的流程，可以选择不高亮任何节点
+            // 或者只高亮最后一个活动节点
+            List<HistoricActivityInstance> lastActivity = historyService
+                    .createHistoricActivityInstanceQuery()
+                    .processInstanceId(instanceId)
+                    .orderByHistoricActivityInstanceEndTime()
+                    .desc()
+                    .listPage(0, 1);
+
+            if (!lastActivity.isEmpty()) {
+                activeActivityIds.add(lastActivity.get(0).getActivityId());
+            }
         }
-        InputStream inputStream = generator.generateDiagram(bpmnModel, list, Collections.emptyList(),
-                "宋体", "宋体", "宋体");
+
+        InputStream inputStream = generator.generateDiagram(
+                bpmnModel,
+                activeActivityIds,      // 只高亮当前活动节点
+                highLightedFlows,       // 高亮的流程线
+                "宋体", "宋体", "宋体"
+        );
+
         return inputStream;
+    }
+
+    @Override
+    public void processCancel(Long id) {
+        if (id == null)
+            throw new RuntimeException("非法参数");
+        CarPackageAudit audit = carPackageAuditMapper.selectCarPackageAuditById(id);
+        if (audit == null) throw new RuntimeException("非法参数");
+        if (audit.getStatus() != CarPackageAudit.STATUS_IN_PROGRESS) throw new RuntimeException("只能撤销审核中的请求");
+        runtimeService.deleteProcessInstance(audit.getInstanceId(), "用户主动撤销审核");
+        audit.setStatus(CarPackageAudit.STATUS_CANCEL);
+        carPackageAuditMapper.updateCarPackageAudit(audit);
+        serviceItemMapper.changeAuditStatus(audit.getServiceItemId(), BusServiceItem.AUDITSTATUS_INIT);
+
+
+    }
+
+    @Override
+    public List<HistoryVO> getHistoryVOList(String instanceId) {
+        if (instanceId == null) {
+            throw new RuntimeException("非法参数");
+        }
+        List<HistoricTaskInstance> list = historyService.createHistoricTaskInstanceQuery()
+                .processInstanceId(instanceId)
+                .list();
+        List<HistoryVO> vos = new ArrayList<>();
+        for (HistoricTaskInstance historicTaskInstance : list) {
+            HistoryVO vo = new HistoryVO();
+            vo.setTaskName(historicTaskInstance.getName());
+            vo.setStartTime(historicTaskInstance.getStartTime().toLocaleString());
+            Date end = historicTaskInstance.getEndTime();
+            vo.setEndTime(end == null ? "" : end.toLocaleString());
+            Long durationInMillis = historicTaskInstance.getDurationInMillis();
+            vo.setDurationInMillis(durationInMillis == null ? "" : durationInMillis / 1000 + "");
+            List<Comment> taskComments = taskService.getTaskComments(historicTaskInstance.getId());
+            if (taskComments != null && taskComments.size() > 0) {
+                String comment = taskComments.get(0).getFullMessage();
+                vo.setComment(comment);
+            }
+            vos.add(vo);
+        }
+        return vos;
     }
 
     @Override
@@ -214,38 +297,8 @@ public class CarPackageAuditServiceImpl implements ICarPackageAuditService {
 
     @Override
     public List<CarPackageAudit> selectDoneTaskList(CarPackageAudit carPackageAudit) {
-        // 当前登录用户的id
-        Long userId = SecurityUtils.getUserId();
-        BusBpmnInfo bpmnInfo = busBpmnInfoMapper.selectByType(0);
-        if (bpmnInfo == null) {
-            throw new RuntimeException("非法参数");
-        }
-        String processDefinitionKey = bpmnInfo.getProcessDefinitionKey();
-
-        // 查询当前用户已经完成的任务
-        List<HistoricTaskInstance> historicTaskList = historyService.createHistoricTaskInstanceQuery()
-                .processDefinitionKey(processDefinitionKey)
-                .taskAssignee(userId.toString())
-                .finished()  // 只查询已完成的任务
-                .list();
-
-        if (historicTaskList == null || historicTaskList.size() == 0) {
-            return Collections.emptyList();
-        }
-
-        List<String> instanceIdList = new ArrayList<>();
-        for (HistoricTaskInstance task : historicTaskList) {
-            instanceIdList.add(task.getProcessInstanceId());
-        }
-
-        List<CarPackageAudit> auditList = new ArrayList<>();
-        for (String instanceId : instanceIdList) {
-            CarPackageAudit audit = carPackageAuditMapper.selectByInstanceId(instanceId);
-            if (audit != null) {
-                auditList.add(audit);
-            }
-        }
-        return auditList;
+        carPackageAudit.getParams().put("userId", SecurityUtils.getUsername());
+        return carPackageAuditMapper.selectCarPackageAuditList(carPackageAudit);
     }
 
     @Override

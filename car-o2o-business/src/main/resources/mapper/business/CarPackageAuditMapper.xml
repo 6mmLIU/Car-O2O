@@ -24,20 +24,26 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectCarPackageAuditList" parameterType="CarPackageAudit" resultMap="CarPackageAuditResult">
         <include refid="selectCarPackageAuditVo"/>
         <where>
-            <if test="serviceItemId != null "> and service_item_id = #{serviceItemId}</if>
-            <if test="serviceItemName != null  and serviceItemName != ''"> and service_item_name like concat('%', #{serviceItemName}, '%')</if>
-            <if test="serviceItemInfo != null  and serviceItemInfo != ''"> and service_item_info = #{serviceItemInfo}</if>
-            <if test="serviceItemPrice != null "> and service_item_price = #{serviceItemPrice}</if>
-            <if test="instanceId != null  and instanceId != ''"> and instance_id = #{instanceId}</if>
-            <if test="creatorId != null  and creatorId != ''"> and creator_id = #{creatorId}</if>
-            <if test="info != null  and info != ''"> and info = #{info}</if>
-            <if test="status != null "> and status = #{status}</if>
-             <if test="params.processInstanceIdList!=null">
-                 and instance_id in
-                 <foreach collection="params.processInstanceIdList" item="instanceId" open="(" close=")" separator=",">
-                     #{instanceId}
-                 </foreach>
-             </if>
+            <if test="serviceItemId != null ">and service_item_id = #{serviceItemId}</if>
+            <if test="serviceItemName != null  and serviceItemName != ''">and service_item_name like concat('%',
+                #{serviceItemName}, '%')
+            </if>
+            <if test="serviceItemInfo != null  and serviceItemInfo != ''">and service_item_info = #{serviceItemInfo}
+            </if>
+            <if test="serviceItemPrice != null ">and service_item_price = #{serviceItemPrice}</if>
+            <if test="instanceId != null  and instanceId != ''">and instance_id = #{instanceId}</if>
+            <if test="creatorId != null  and creatorId != ''">and creator_id = #{creatorId}</if>
+            <if test="info != null  and info != ''">and info = #{info}</if>
+            <if test="status != null ">and status = #{status}</if>
+            <if test="params.processInstanceIdList!=null">
+                and instance_id in
+                <foreach collection="params.processInstanceIdList" item="instanceId" open="(" close=")" separator=",">
+                    #{instanceId}
+                </foreach>
+            </if>
+            <if test="params.userId !=null and params.userId !=''">
+                and info like concat('%',#{params.userId},'%')
+            </if>
         </where>
     </select>
 

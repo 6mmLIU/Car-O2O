@@ -6,6 +6,7 @@ import java.util.List;
 import javax.servlet.http.HttpServletResponse;
 
 import cn.wolfcode.business.dto.AuditDTO;
+import cn.wolfcode.business.vo.HistoryVO;
 import org.apache.commons.compress.utils.IOUtils;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -127,4 +128,28 @@ public class CarPackageAuditController extends BaseController {
         return AjaxResult.success();
 
     }
+
+    /**
+     * 查询审批历史列表
+     */
+    @GetMapping("/historyTask")
+    public AjaxResult historyTask(String instanceId) {
+        // 需要在Service中实现这个方法
+        List<HistoryVO> vos = carPackageAuditService.getHistoryVOList(instanceId);
+        return AjaxResult.success(vos);
+    }
+
+    @DeleteMapping(value = "/{id}", headers = "cmd=processCancel")
+    public AjaxResult processCancel(@PathVariable("id") Long id) {
+        carPackageAuditService.processCancel(id);
+        return AjaxResult.success();
+    }
+
+    @GetMapping("/selectDoneTaskList")
+    public TableDataInfo selectDoneTakList(CarPackageAudit carPackageAudit) {
+        startPage();
+        List<CarPackageAudit> list = carPackageAuditService.selectDoneTaskList(carPackageAudit);
+        return getDataTable(list);
+    }
+
 }
